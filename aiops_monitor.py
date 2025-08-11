@@ -9,19 +9,30 @@ import pandas as pd
 import joblib
 import numpy as np
 import requests
+import configparser
 
 # ==============================================================================
 # --- 1. 全域設定 (可依需求修改) ---
 # ==============================================================================
+# 讀取配置文件
+config = configparser.ConfigParser()
+config.read('config.ini')
+
 # 監控的目標 IP (建議包含穩定目標、備用目標及一個無效 IP 以測試丟包)
 TARGETS = ['8.8.8.8', '1.1.1.1'] 
 PING_INTERVAL_SECONDS = 10  # 每 10 秒執行一次 PING
 CSV_DATA_FILE = 'ping_data.csv'  # 儲存歷史數據的檔案
 MODEL_FILE_PREFIX = 'iforest_model' # 模型檔案名稱的前綴
 
-# --- Telegram Bot 設定 (請替換成您自己的資訊) ---
-TELEGRAM_BOT_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"  # 貼上您的 Bot Token
-TELEGRAM_CHAT_ID = "YOUR_TELEGRAM_CHAT_ID"        # 貼上您的 Chat ID
+# --- Telegram Bot 設定 (從 config.ini 讀取) ---
+TELEGRAM_ENABLED = config.getboolean('TELEGRAM', 'TELEGRAM_ENABLED', fallback=False)
+
+if TELEGRAM_ENABLED:
+    TELEGRAM_BOT_TOKEN = config.get('TELEGRAM', 'TELEGRAM_BOT_TOKEN', fallback="YOUR_TELEGRAM_BOT_TOKEN")
+    TELEGRAM_CHAT_ID = config.get('TELEGRAM', 'TELEGRAM_CHAT_ID', fallback="YOUR_TELEGRAM_CHAT_ID")
+else:
+    TELEGRAM_BOT_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
+    TELEGRAM_CHAT_ID = "YOUR_TELEGRAM_CHAT_ID"
 
 # --- AI 與決策規則設定 ---
 # 連續幾次丟包率超過閾值才觸發「連線中斷」警報
@@ -144,6 +155,10 @@ def send_telegram_alert(message: str):
     """
     透過 Telegram Bot API 發送格式化的警告訊息。
     """
+    if not TELEGRAM_ENABLED:
+        print("  [i] Telegram notifications are disabled in config.")
+        return
+        
     if not all([TELEGRAM_BOT_TOKEN != "YOUR_TELEGRAM_BOT_TOKEN", TELEGRAM_CHAT_ID != "YOUR_TELEGRAM_CHAT_ID"]):
         print("  [!] Telegram credentials are not configured. Skipping notification.")
         return
